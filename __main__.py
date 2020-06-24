@@ -1,20 +1,22 @@
-import server_commands
 import sys
 import os
+import subprocess
+
+import server_commands
+import global_var
 
 def invalid(*args, **kwargs):
     """
     Called when there is an unrecognized command
     """
     print(command, "is not a recognized command!")
-    return 0
 
-def test(compare):
-    test_str = "server_path"
-    trait, value = compare.split('=')
-    if trait == test_str:
-        print('I AM THE SAME')
-    return 0
+def list_running_game_servers(*args, **kwargs):
+    print(global_var.running_servers)
+
+def test():
+    path = os.path.join('/home/robert', 'tomato')
+    os.mkdir(path)
 
 while True:
     input_command = input()
@@ -25,6 +27,7 @@ while True:
         'start'   : server_commands.start_server,
         'stop'    : server_commands.stop_server,
         'restart' : server_commands.restart_server,
+        'list'    : list_running_game_servers,
         'test'    : test
     }
     func = cmds.get(command, invalid)

@@ -1,1 +1,1 @@
-server_path=/home/robert/
+path_for_servers=/home/robert/

@@ -6,3 +6,6 @@ class CustomException(Exception):
 class ExtraTraitError(CustomException):
     "Error when there is an unexpected or undefined trait."
     pass
+
+class LastResortError(CustomException):
+    "Error to direct to methods of last resort"

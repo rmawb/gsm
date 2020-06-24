@@ -1,9 +1,14 @@
 #main commands for managing game servers
 
-import valid
-import extract
+import subprocess
 import os
 import sys
+
+import valid
+import extract
+import global_var
+import misc
+from errors import LastResortError
 
 def install_server(game_name, *args):
     """
@@ -18,15 +23,16 @@ def install_server(game_name, *args):
         server_name = input()
 
     #Makes directory for server
-    server_path = extract.config('server_path')
+    path_for_servers = extract.trait('path_for_servers', '/home/robert/gsm/config.txt')
+    server_path = os.path.join(path_for_servers, server_name)
     try:
-        os.mkdir(server_path + "/" + server_name)
+        os.mkdir(server_path)
     except FileExistsError:
         print("Server already exists!")
-        print("Check", server_path, "for directory called:", server_name)
+        print("Check", path_for_servers, "for directory called:", server_name)
         sys.exit()
     except FileNotFoundError:
-        print("Server path invalid. Check config file for 'server_path'")
+        print("Path invalid. Check config file for 'path_for_servers'")
         sys.exit()
     except Exception as e:
         print("Unexpected Error:")
@@ -35,43 +41,58 @@ def install_server(game_name, *args):
 
     #Checks module for that game and creates server
     game_module = valid.game(game_name)
-    game_module.core.get(server_name, server_path)
+    game_module.core.get(server_path)
     print("Making server:", server_name)
 
-def get_init(server_name):
-    """
-    Sets values for start, stop, and restart functions.
-    Input: server_name
-    Output: Tuple of (game_module, server_path)
-    
-    server_name is the name of the particular server
-    game_module is the module describing the game in general
-    server_path is the path locating the game servers
-    """
-    game_name = extract.game_name(server_name)
-    game_module = valid.game(game_name)
-    server_path = extract.config('server_path')
-    valid.dir()
-    return game_module, server_path
+    #Creates gsm data for later use
+    with open ('{}'.format(server_path + '/.gsm_info.txt'), 'w') as f:
+        f.write('game={}'.format(game_name))
 
 def start_server(server_name):
     """
     Starts a server with the given server_name
     Input: server_name
     """
-    game_module, server_path = get_init(server_name)
-    game_module.core.start(server_name, server_path)
+    #gets info on what game the server is
+    path_for_servers = extract.trait('path_for_servers', 'gsm/config.txt')
+    server_path = os.path.join(path_for_servers, server_name)
+    game_name = extract.trait('game', server_path + '/.gsm_info.txt')
+    game_module = valid.game(game_name)
+
+    #gets processes related to game and stores them
+    processes = game_module.core.start(server_path)
+    global_var.running_servers[server_name] = processes
+    
 
 def stop_server(server_name):
     """
     Stops a server with the given server_name
     Input: server_name
     """
-    game_module, server_path = get_init(server_name, server_path)
+    if server_name in global_var.running_servers:
+        process = global_var.running_servers[server_name]
+    else:
+        print("There is no server with the name", server_name, "currently running!")
+        return
+    path_for_servers = extract.trait('path_for_servers', 'gsm/config.txt')
+    server_path = os.path.join(path_for_servers, server_name)
+    game_name = extract.trait('game', server_path + '/.gsm_info.txt')
+    game_module = valid.game(game_name)
+    try:
+        game_module.core.stop(server_path, process)
+        global_var.running_servers.pop(server_name)
+    except LastResortError:
+        print("Server is not shutting down properly, killing the process.")
+        misc.hard_kill(process)
+        global_var.running_servers.pop(server_name)
+    except Exception as e:
+        print("Unexpected Error:")
+        print(e)
 
 def restart_server(server_name):
     """
     Restarts a server with the given server_name
     Input: server_name
     """
-    game_module, server_path = get_init(server_name, server_path)
+    stop_server(server_name)
+    start_server(server_name)
